@@ -16,6 +16,7 @@ namespace Piccolo
         static void reset();
 
     private:
+        //原子操作
         static std::atomic<ParticleEmitterID> m_next_id;
     };
 } // namespace Piccolo

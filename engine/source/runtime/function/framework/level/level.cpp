@@ -65,10 +65,13 @@ namespace Piccolo
             return false;
         }
 
+        //断言检测
         ASSERT(g_runtime_global_context.m_physics_manager);
+        //levelres主要是定义了这个场景下的物理，和名称
         m_physics_scene = g_runtime_global_context.m_physics_manager->createPhysicsScene(level_res.m_gravity);
         ParticleEmitterIDAllocator::reset();
 
+        //创建物体
         for (const ObjectInstanceRes& object_instance_res : level_res.m_objects)
         {
             createObject(object_instance_res);

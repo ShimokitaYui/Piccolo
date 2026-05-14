@@ -22,11 +22,13 @@ namespace Piccolo
 //#define CLASS(class_name,...) class class_name:public Reflection::object
 #endif // __REFLECTION_PARSER__
 
+//设置为友元类
 #define REFLECTION_BODY(class_name) \
     friend class Reflection::TypeFieldReflectionOparator::Type##class_name##Operator; \
     friend class Serializer;
     // public: virtual std::string getTypeName() override {return #class_name;}
 
+//定义外部类，代码分析器会构建这个类来实现反射功能
 #define REFLECTION_TYPE(class_name) \
     namespace Reflection \
     { \

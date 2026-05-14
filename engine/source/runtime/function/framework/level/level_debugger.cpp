@@ -14,6 +14,7 @@
 #include "runtime/function/render/render_debug_config.h"
 namespace Piccolo
 {
+    //
     void LevelDebugger::tick(std::shared_ptr<Level> level) const
     {
         if (g_is_editor_mode)

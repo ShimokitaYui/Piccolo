@@ -81,6 +81,7 @@ namespace Piccolo
             return false;
         }
 
+        // 为某个对象分配内存并以提供的实参初始化该对象。返回管理新创建的对象的 std::shared_ptr 对象。
         m_current_world_resource = std::make_shared<WorldRes>(world_res);
 
         const bool is_level_load_success = loadLevel(world_res.m_default_level_url);
