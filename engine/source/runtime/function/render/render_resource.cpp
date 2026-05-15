@@ -114,13 +114,19 @@ namespace Piccolo
     void RenderResource::updatePerFrameBuffer(std::shared_ptr<RenderScene>  render_scene,
         std::shared_ptr<RenderCamera> camera)
     {
+        //获得视角转换矩阵
         Matrix4x4 view_matrix = camera->getViewMatrix();
+        //计算透视矩阵
         Matrix4x4 proj_matrix = camera->getPersProjMatrix();
+        //获得camera位置
         Vector3   camera_position = camera->position();
+
         Matrix4x4 proj_view_matrix = proj_matrix * view_matrix;
 
         // ambient light
+        // 获得环境光位置
         Vector3  ambient_light = render_scene->m_ambient_light.m_irradiance;
+        // 获得点光源数量
         uint32_t point_light_num = static_cast<uint32_t>(render_scene->m_point_light_list.m_lights.size());
 
         // set ubo data
@@ -135,7 +141,8 @@ namespace Piccolo
 
 
         m_mesh_point_light_shadow_perframe_storage_buffer_object.point_light_num = point_light_num;
-        // point lights
+
+        // point lights 传输点光源信息
         for (uint32_t i = 0; i < point_light_num; i++)
         {
             Vector3 point_light_position = render_scene->m_point_light_list.m_lights[i].m_position;

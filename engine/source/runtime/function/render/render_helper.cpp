@@ -212,8 +212,11 @@ namespace Piccolo
         // Compute and transform the corners and find new min/max bounds.
         for (size_t i = 0; i < CORNER_COUNT; ++i)
         {
+            //角落的坐标
             Vector3 corner_before = extents * g_BoxOffset[i] + center;
+            //角落转换后的坐标
             Vector4 corner_with_w = m * Vector4(corner_before.x, corner_before.y, corner_before.z, 1.0);
+            //压缩
             Vector3 corner        = Vector3(corner_with_w.x / corner_with_w.w,
                                          corner_with_w.y / corner_with_w.w,
                                          corner_with_w.z / corner_with_w.w);
@@ -271,6 +274,7 @@ namespace Piccolo
         BoundingBox frustum_bounding_box;
         // CascadedShadowMaps11 / CreateFrustumPointsFromCascadeInterval
         {
+            // 1. 定义 NDC 空间（标准正方体）的 8 个顶点 包括了远裁面的4个点和近裁面的4个点
             Vector3 const g_frustum_points_ndc_space[8] = {Vector3(-1.0f, -1.0f, 1.0f),
                                                              Vector3(1.0f, -1.0f, 1.0f),
                                                              Vector3(1.0f, 1.0f, 1.0f),
@@ -279,12 +283,13 @@ namespace Piccolo
                                                              Vector3(1.0f, -1.0f, 0.0f),
                                                              Vector3(1.0f, 1.0f, 0.0f),
                                                              Vector3(-1.0f, 1.0f, 0.0f)};
-
+            //把屏幕上的 8 个角“推回”到世界坐标系中。
             Matrix4x4 inverse_proj_view_matrix = proj_view_matrix.inverse();
 
             frustum_bounding_box.min_bound = Vector3(FLT_MAX, FLT_MAX, FLT_MAX);
             frustum_bounding_box.max_bound = Vector3(FLT_MIN, FLT_MIN, FLT_MIN);
 
+            //循环遍历将4个点转换为世界坐标
             size_t const CORNER_COUNT = 8;
             for (size_t i = 0; i < CORNER_COUNT; ++i)
             {
@@ -296,10 +301,12 @@ namespace Piccolo
                                                 frustum_point_with_w.y / frustum_point_with_w.w,
                                                 frustum_point_with_w.z / frustum_point_with_w.w);
 
+                //获得玩家视角是世界中的8个点位
                 frustum_bounding_box.merge(frustum_point);
             }
         }
 
+        //使用一个盒子将场景中所有物体都包括进来
         BoundingBox scene_bounding_box;
         {
             scene_bounding_box.min_bound = Vector3(FLT_MAX, FLT_MAX, FLT_MAX);
@@ -320,20 +327,27 @@ namespace Piccolo
         Matrix4x4 light_view;
         Matrix4x4 light_proj;
         {
+            //计算中心点
             Vector3 box_center((frustum_bounding_box.max_bound.x + frustum_bounding_box.min_bound.x) * 0.5,
                                  (frustum_bounding_box.max_bound.y + frustum_bounding_box.min_bound.y) * 0.5,
                                  (frustum_bounding_box.max_bound.z + frustum_bounding_box.min_bound.z));
+            //计算半宽半高等
             Vector3 box_extents((frustum_bounding_box.max_bound.x - frustum_bounding_box.min_bound.x) * 0.5,
                                   (frustum_bounding_box.max_bound.y - frustum_bounding_box.min_bound.y) * 0.5,
                                   (frustum_bounding_box.max_bound.z - frustum_bounding_box.min_bound.z) * 0.5);
-
+            //计算光源位置
             Vector3 eye =
                 box_center + scene.m_directional_light.m_direction * box_extents.length();
             Vector3 center = box_center;
+            //光照的转换矩阵
             light_view       = Math::makeLookAtMatrix(eye, center, Vector3(0.0, 0.0, 1.0));
 
+            //玩家视角的Box转换到光照的视角
             BoundingBox frustum_bounding_box_light_view = BoundingBoxTransform(frustum_bounding_box, light_view);
+            //场景物体同理
             BoundingBox scene_bounding_box_light_view   = BoundingBoxTransform(scene_bounding_box, light_view);
+
+            //输入两个Box相交的最小空间并归一化获得这个盒子中心为原点的坐标的转换矩阵
             light_proj = Math::makeOrthographicProjectionMatrix01(
                 std::max(frustum_bounding_box_light_view.min_bound.x, scene_bounding_box_light_view.min_bound.x),
                 std::min(frustum_bounding_box_light_view.max_bound.x, scene_bounding_box_light_view.max_bound.x),
@@ -344,6 +358,7 @@ namespace Piccolo
                 -std::max(frustum_bounding_box_light_view.min_bound.z, scene_bounding_box_light_view.min_bound.z));
         }
 
+        //最终光照的转换矩阵 相对于是世界坐标转换到光源坐标再转换到盒子坐标
         Matrix4x4 light_proj_view = (light_proj * light_view);
         return light_proj_view;
     }

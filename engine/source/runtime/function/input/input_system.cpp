@@ -120,6 +120,7 @@ namespace Piccolo
 
     void InputSystem::calculateCursorDeltaAngles()
     {
+        //获得窗口大小
         std::array<int, 2> window_size = g_runtime_global_context.m_window_system->getWindowSize();
 
         if (window_size[0] < 1 || window_size[1] < 1)

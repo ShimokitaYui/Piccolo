@@ -88,7 +88,7 @@ namespace Piccolo
                 break;
             default:
                 break;
-        }
+        }           
         return view_matrix;
     }
 

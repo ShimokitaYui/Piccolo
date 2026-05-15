@@ -103,13 +103,16 @@ namespace Piccolo
         m_rhi->prepareContext();
 
         // update per-frame buffer
+        // 上传全局通用数据 包括场景中的光线以及相机位置
         m_render_resource->updatePerFrameBuffer(m_render_scene, m_render_camera);
 
         // update per-frame visible objects
+        // 去除不可见物体
         m_render_scene->updateVisibleObjects(std::static_pointer_cast<RenderResource>(m_render_resource),
                                              m_render_camera);
 
         // prepare pipeline's render passes data
+        // 准备渲染通道数据
         m_render_pipeline->preparePassData(m_render_resource);
 
         g_runtime_global_context.m_debugdraw_manager->tick(delta_time);

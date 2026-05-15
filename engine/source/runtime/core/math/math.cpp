@@ -12,6 +12,8 @@ namespace Piccolo
         return std::fabs(b - a) <= tolerance;
     }
 
+    
+	//想象屏幕是以玩家为中心的环绕园，把鼠标移动的距离就等于弧度，然后根据规定的是半径计算角度。
     float Math::degreesToRadians(float degrees) { return degrees * Math_fDeg2Rad; }
 
     float Math::radiansToDegrees(float radians) { return radians * Math_fRad2Deg; }
@@ -114,8 +116,10 @@ namespace Piccolo
 
     Matrix4x4 Math::makeLookAtMatrix(const Vector3& eye_position, const Vector3& target_position, const Vector3& up_dir)
     {
+        //确认上方
         const Vector3& up = up_dir.normalisedCopy();
 
+        //确认前方
         Vector3 f = (target_position - eye_position).normalisedCopy();
         Vector3 s = f.crossProduct(up).normalisedCopy();
         Vector3 u = s.crossProduct(f);
@@ -137,15 +141,25 @@ namespace Piccolo
         return view_mat;
     }
 
+    /// <summary>
+    /// 计算透视矩阵
+    /// </summary>
+    /// <param name="fovy"> Fov的垂直值 </param>
+    /// <param name="aspect"> 屏幕比例 </param>
+    /// <param name="znear"> 近裁剪面(最近能看见的物体) </param>
+    /// <param name="zfar"> 远裁剪面(最远能看见的物体)</param>
+    /// <returns>透视矩阵</returns>
     Matrix4x4 Math::makePerspectiveMatrix(Radian fovy, float aspect, float znear, float zfar)
     {
+        //一半的角度
         float tan_half_fovy = Math::tan(fovy / 2.f);
-
+        
+        //(aspect * tan_half_fovy)水平方向的角度
         Matrix4x4 ret = Matrix4x4::ZERO;
         ret[0][0]     = 1.f / (aspect * tan_half_fovy);
         ret[1][1]     = 1.f / tan_half_fovy;
         ret[2][2]     = zfar / (znear - zfar);
-        ret[3][2]     = -1.f;
+        ret[3][2]     = -1.f; //负责透视
         ret[2][3]     = -(zfar * znear) / (zfar - znear);
 
         return ret;
@@ -195,15 +209,20 @@ namespace Piccolo
     Matrix4x4
     Math::makeOrthographicProjectionMatrix01(float left, float right, float bottom, float top, float znear, float zfar)
     {
+        //长度
         float inv_width    = 1.0f / (right - left);
         float inv_height   = 1.0f / (top - bottom);
         float inv_distance = 1.0f / (zfar - znear);
 
+        //放缩因子
         float A  = 2 * inv_width;
         float B  = 2 * inv_height;
+        //归一化下的中心坐标
         float C  = -(right + left) * inv_width;
+        //归一化下的中心坐标
         float D  = -(top + bottom) * inv_height;
         float q  = -1 * inv_distance;
+        //归一化下的中心坐标
         float qn = -znear * inv_distance;
 
         // NB: This creates 'uniform' orthographic projection matrix,

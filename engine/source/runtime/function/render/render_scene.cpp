@@ -87,8 +87,10 @@ namespace Piccolo
     void RenderScene::updateVisibleObjectsDirectionalLight(std::shared_ptr<RenderResource> render_resource,
                                                            std::shared_ptr<RenderCamera>   camera)
     {
+        //获得光源转换矩阵
         Matrix4x4 directional_light_proj_view = CalculateDirectionalLightCamera(*this, *camera);
 
+        //存储矩阵
         render_resource->m_mesh_perframe_storage_buffer_object.directional_light_proj_view =
             directional_light_proj_view;
         render_resource->m_mesh_directional_light_shadow_perframe_storage_buffer_object.light_proj_view =
@@ -96,6 +98,7 @@ namespace Piccolo
 
         m_directional_light_visible_mesh_nodes.clear();
 
+        //根据转换到世界坐标系下
         ClusterFrustum frustum =
             CreateClusterFrustumFromMatrix(directional_light_proj_view, -1.0, 1.0, -1.0, 1.0, 0.0, 1.0);
 

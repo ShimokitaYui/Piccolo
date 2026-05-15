@@ -153,6 +153,8 @@ namespace Piccolo
                 id_object_pair.second->tick(delta_time);
             }
         }
+
+        //人机交互
         if (m_current_active_character && g_is_editor_mode == false)
         {
             m_current_active_character->tick(delta_time);
