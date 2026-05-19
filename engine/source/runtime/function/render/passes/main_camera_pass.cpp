@@ -39,12 +39,14 @@ namespace Piccolo
         setupParticlePass();
     }
 
+    //传递是相机信息 和场景信息中固定的大方向
     void MainCameraPass::preparePassData(std::shared_ptr<RenderResourceBase> render_resource)
     {
         const RenderResource* vulkan_resource = static_cast<const RenderResource*>(render_resource.get());
         if (vulkan_resource)
         {
             m_mesh_perframe_storage_buffer_object = vulkan_resource->m_mesh_perframe_storage_buffer_object;
+            //坐标信息
             m_axis_storage_buffer_object          = vulkan_resource->m_axis_storage_buffer_object;
         }
     }

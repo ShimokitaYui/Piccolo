@@ -12,10 +12,15 @@ namespace Piccolo
     void RenderScene::updateVisibleObjects(std::shared_ptr<RenderResource> render_resource,
                                            std::shared_ptr<RenderCamera>   camera)
     {
+        //环境光处理
         updateVisibleObjectsDirectionalLight(render_resource, camera);
+        //点光源处理
         updateVisibleObjectsPointLight(render_resource);
+        //计算出在视野范围内的物体
         updateVisibleObjectsMainCamera(render_resource, camera);
+        //更新坐标轴
         updateVisibleObjectsAxis(render_resource);
+        //粒子系统
         updateVisibleObjectsParticle(render_resource);
     }
 
@@ -104,9 +109,10 @@ namespace Piccolo
 
         for (const RenderEntity& entity : m_render_entities)
         {
+            // 计算出两个顶点
             BoundingBox mesh_asset_bounding_box {entity.m_bounding_box.getMinCorner(),
                                                  entity.m_bounding_box.getMaxCorner()};
-
+            //判断是否在范围内
             if (TiledFrustumIntersectBox(frustum, BoundingBoxTransform(mesh_asset_bounding_box, entity.m_model_matrix)))
             {
                 m_directional_light_visible_mesh_nodes.emplace_back();
@@ -114,6 +120,7 @@ namespace Piccolo
 
                 temp_node.model_matrix = &entity.m_model_matrix;
 
+                //存储节点矩阵信息
                 assert(entity.m_joint_matrices.size() <= s_mesh_vertex_blending_max_joint_count);
                 if (!entity.m_joint_matrices.empty())
                 {
@@ -122,10 +129,12 @@ namespace Piccolo
                 }
                 temp_node.node_id = entity.m_instance_id;
 
+                //原始网格数据
                 VulkanMesh& mesh_asset           = render_resource->getEntityMesh(entity);
                 temp_node.ref_mesh               = &mesh_asset;
                 temp_node.enable_vertex_blending = entity.m_enable_vertex_blending;
 
+                //获取并绑定物理材质
                 VulkanPBRMaterial& material_asset = render_resource->getEntityMaterial(entity);
                 temp_node.ref_material            = &material_asset;
             }
@@ -150,13 +159,13 @@ namespace Piccolo
             BoundingBox mesh_asset_bounding_box {entity.m_bounding_box.getMinCorner(),
                                                  entity.m_bounding_box.getMaxCorner()};
 
-            bool intersect_with_point_lights = true;
+            bool intersect_with_point_lights = false;
             for (size_t i = 0; i < point_light_num; i++)
             {
-                if (!BoxIntersectsWithSphere(BoundingBoxTransform(mesh_asset_bounding_box, entity.m_model_matrix),
+                if (BoxIntersectsWithSphere(BoundingBoxTransform(mesh_asset_bounding_box, entity.m_model_matrix),
                                              point_lights_bounding_spheres[i]))
                 {
-                    intersect_with_point_lights = false;
+                    intersect_with_point_lights = true;
                     break;
                 }
             }

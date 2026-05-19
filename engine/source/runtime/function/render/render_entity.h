@@ -12,6 +12,7 @@ namespace Piccolo
     {
     public:
         uint32_t  m_instance_id {0};
+        //模型矩阵（Model Matrix） 或 世界变换矩阵（World Matrix）。
         Matrix4x4 m_model_matrix {Matrix4x4::IDENTITY};
 
         // mesh

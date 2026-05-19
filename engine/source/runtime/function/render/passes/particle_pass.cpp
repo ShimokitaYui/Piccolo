@@ -1932,6 +1932,7 @@ namespace Piccolo
         const RenderResource* vulkan_resource = static_cast<const RenderResource*>(render_resource.get());
         if (vulkan_resource)
         {
+            //转换矩阵
             m_particle_collision_perframe_storage_buffer_object =
                 vulkan_resource->m_particle_collision_perframe_storage_buffer_object;
             memcpy(m_scene_uniform_buffer_mapped,

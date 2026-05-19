@@ -165,6 +165,7 @@ namespace Piccolo
         m_mesh_perframe_storage_buffer_object.scene_directional_light.color = render_scene->m_directional_light.m_color;
 
         // pick pass view projection matrix
+        // 相机转换矩阵
         m_mesh_inefficient_pick_perframe_storage_buffer_object.proj_view_matrix = proj_view_matrix;
 
         m_particlebillboard_perframe_storage_buffer_object.proj_view_matrix = proj_view_matrix;

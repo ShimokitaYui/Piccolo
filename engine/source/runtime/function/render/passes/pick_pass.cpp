@@ -31,13 +31,17 @@ namespace Piccolo
         setupDescriptorSet();
     }
     void PickPass::postInitialize() {}
+
+    //对象拾取通道
     void PickPass::preparePassData(std::shared_ptr<RenderResourceBase> render_resource)
     {
         const RenderResource* vulkan_resource = static_cast<const RenderResource*>(render_resource.get());
         if (vulkan_resource)
         {
+            //相机转换矩阵
             _mesh_inefficient_pick_perframe_storage_buffer_object.proj_view_matrix =
                 vulkan_resource->m_mesh_inefficient_pick_perframe_storage_buffer_object.proj_view_matrix;
+            //获取屏幕的真实物理分辨率
             _mesh_inefficient_pick_perframe_storage_buffer_object.rt_width  = m_rhi->getSwapchainInfo().extent.width;
             _mesh_inefficient_pick_perframe_storage_buffer_object.rt_height = m_rhi->getSwapchainInfo().extent.height;
         }

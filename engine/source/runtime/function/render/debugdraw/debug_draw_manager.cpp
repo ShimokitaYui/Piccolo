@@ -45,6 +45,7 @@ namespace Piccolo
         m_debug_draw_context.clear();
     }
 
+    //删除已经过期的debug
     void DebugDrawManager::tick(float delta_time)
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -67,6 +68,7 @@ namespace Piccolo
 
     }
 
+    //添加待渲染的Debug
     void DebugDrawManager::swapDataToRender()
     {
         std::lock_guard<std::mutex> guard(m_mutex);
