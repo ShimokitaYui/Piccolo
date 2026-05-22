@@ -12,6 +12,7 @@
 
 namespace Piccolo
 {
+    //注册过的类型会在编辑模式下也会Tick不然就不会
     void registerEdtorTickComponent(std::string component_type_name)
     {
         g_editor_tick_component_types.insert(component_type_name);

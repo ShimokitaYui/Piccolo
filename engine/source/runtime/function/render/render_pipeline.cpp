@@ -124,8 +124,10 @@ namespace Piccolo
 
         vulkan_rhi->resetCommandPool();
 
+        //将指令写入commandbuffer
         bool recreate_swapchain =
             vulkan_rhi->prepareBeforePass(std::bind(&RenderPipeline::passUpdateAfterRecreateSwapchain, this));
+        //判断是否需要重新刷新交换链
         if (recreate_swapchain)
         {
             return;

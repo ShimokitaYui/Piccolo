@@ -25,6 +25,7 @@ namespace Piccolo
 
     void RuntimeGlobalContext::startSystems(const std::string& config_file_path)
     {
+        //加载日志
         m_config_manager = std::make_shared<ConfigManager>();
         m_config_manager->initialize(config_file_path);
 

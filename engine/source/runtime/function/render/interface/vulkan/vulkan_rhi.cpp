@@ -1832,6 +1832,7 @@ namespace Piccolo
 
     void VulkanRHI::cmdBeginRenderPassPFN(RHICommandBuffer* commandBuffer, const RHIRenderPassBeginInfo* pRenderPassBegin, RHISubpassContents contents)
     {
+        //范围以及位置
         VkOffset2D offset_2d{};
         offset_2d.x = pRenderPassBegin->renderArea.offset.x;
         offset_2d.y = pRenderPassBegin->renderArea.offset.y;

@@ -464,7 +464,7 @@ namespace Piccolo
         std::map<VulkanPBRMaterial*, std::map<VulkanMesh*, std::vector<MeshNode>>>
             directional_light_mesh_drawcall_batch;
 
-        // reorganize mesh
+        // reorganize mesh 根据mesh和材质进行分类打包
         for (RenderMeshNode& node : *(m_visiable_nodes.p_directional_light_visible_mesh_nodes))
         {
             auto& mesh_instanced = directional_light_mesh_drawcall_batch[node.ref_material];
@@ -485,15 +485,18 @@ namespace Piccolo
         {
             RHIRenderPassBeginInfo renderpass_begin_info {};
             renderpass_begin_info.sType             = RHI_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            //渲染通道
             renderpass_begin_info.renderPass        = m_framebuffer.render_pass;
             renderpass_begin_info.framebuffer       = m_framebuffer.framebuffer;
             renderpass_begin_info.renderArea.offset = {0, 0};
+            //画面大小
             renderpass_begin_info.renderArea.extent = {s_directional_light_shadow_map_dimension,
                                                        s_directional_light_shadow_map_dimension};
 
             RHIClearValue clear_values[2];
             clear_values[0].color                 = {1.0f};
             clear_values[1].depthStencil          = {1.0f, 0};
+            //计算数组的大小
             renderpass_begin_info.clearValueCount = (sizeof(clear_values) / sizeof(clear_values[0]));
             renderpass_begin_info.pClearValues    = clear_values;
 
@@ -507,18 +510,23 @@ namespace Piccolo
         if (m_rhi->isPointLightShadowEnabled())
         {
             float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            //指令打上标签
             m_rhi->pushEvent(m_rhi->getCurrentCommandBuffer(), "Mesh", color);
 
+            //管线绑定
             m_rhi->cmdBindPipelinePFN(m_rhi->getCurrentCommandBuffer(), RHI_PIPELINE_BIND_POINT_GRAPHICS, m_render_pipelines[0].pipeline);
 
             // perframe storage buffer
             uint32_t perframe_dynamic_offset =
+                //内存对齐
                 roundUp(m_global_render_resource->_storage_buffer
                             ._global_upload_ringbuffers_end[m_rhi->getCurrentFrameIndex()],
                         m_global_render_resource->_storage_buffer._min_storage_buffer_offset_alignment);
+            //移动End指针
             m_global_render_resource->_storage_buffer
                 ._global_upload_ringbuffers_end[m_rhi->getCurrentFrameIndex()] =
                 perframe_dynamic_offset + sizeof(MeshPerframeStorageBufferObject);
+
             assert(m_global_render_resource->_storage_buffer
                        ._global_upload_ringbuffers_end[m_rhi->getCurrentFrameIndex()] <=
                    (m_global_render_resource->_storage_buffer
@@ -526,6 +534,7 @@ namespace Piccolo
                     m_global_render_resource->_storage_buffer
                         ._global_upload_ringbuffers_size[m_rhi->getCurrentFrameIndex()]));
 
+            //转存视角矩阵等信息
             MeshDirectionalLightShadowPerframeStorageBufferObject& perframe_storage_buffer_object =
                 (*reinterpret_cast<MeshDirectionalLightShadowPerframeStorageBufferObject*>(
                     reinterpret_cast<uintptr_t>(

@@ -167,6 +167,7 @@ namespace Piccolo
 
     std::shared_ptr<RHI>          RenderSystem::getRHI() const { return m_rhi; }
 
+    //设置引擎的渲染位置，最后所有内容都渲染在这个位置上，这个位置是相对位置它的偏移量是相对偏移量而不是按整个屏幕的位置来算的
     void RenderSystem::updateEngineContentViewport(float offset_x, float offset_y, float width, float height)
     {
         std::static_pointer_cast<VulkanRHI>(m_rhi)->m_viewport.x        = offset_x;
