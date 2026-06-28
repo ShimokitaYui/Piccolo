@@ -27,10 +27,12 @@ namespace Pilot
         VkDescriptorSetLayoutBinding& post_process_global_layout_input_attachment_binding =
             post_process_global_layout_bindings[0];
         post_process_global_layout_input_attachment_binding.binding         = 0;
+        //vk::DescriptorType::eInputAttachment
         post_process_global_layout_input_attachment_binding.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         post_process_global_layout_input_attachment_binding.descriptorCount = 1;
         post_process_global_layout_input_attachment_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
-
+        //vk::DescriptorType::eCombinedImageSampler
+        //pass LUT
         VkDescriptorSetLayoutBinding& post_process_global_layout_LUT_binding = post_process_global_layout_bindings[1];
         post_process_global_layout_LUT_binding.binding                       = 1;
         post_process_global_layout_LUT_binding.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -71,6 +73,7 @@ namespace Pilot
             throw std::runtime_error("create post process pipeline layout");
         }
 
+        //shader
         VkShaderModule vert_shader_module =
             PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, POST_PROCESS_VERT);
         VkShaderModule frag_shader_module =
