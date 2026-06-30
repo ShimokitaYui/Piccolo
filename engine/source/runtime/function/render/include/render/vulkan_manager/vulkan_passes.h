@@ -13,6 +13,22 @@ namespace Pilot
         VkImageView directional_light_shadow_color_image_view;
     };
 
+    class PMitonBlurPass : public PRenderPassBase
+    {
+        public:
+            void initialize(VkRenderPass render_pass, VkImageView color_attachment, VkImageView depth_attachment, VkBuffer matrix_ubo_buffer);
+            void draw();
+
+            void updateAfterFramebufferRecreate(VkImageView color_attachment,
+                                                VkImageView depth_attachment,
+                                                VkBuffer    matrix_ubo_buffer);
+
+        private:
+            void setupDescriptorSetLayout();
+            void setupPipelines();
+            void setupDescriptorSet();
+    };
+
     class PColorGradingPass : public PRenderPassBase
     {
     public:
@@ -92,6 +108,7 @@ namespace Pilot
         _main_camera_subpass_forward_lighting,
         _main_camera_subpass_tone_mapping,
         _main_camera_subpass_color_grading,
+        _main_camera_subpass_motion_blur,
         _main_camera_subpass_ui,
         _main_camera_subpass_combine_ui,
         _main_camera_subpass_count
