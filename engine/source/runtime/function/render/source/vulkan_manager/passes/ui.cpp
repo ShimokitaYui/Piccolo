@@ -71,7 +71,7 @@ namespace Pilot
         init_info.QueueFamily               = m_p_vulkan_context->_queue_indices.graphicsFamily.value();
         init_info.Queue                     = m_p_vulkan_context->_graphics_queue;
         init_info.DescriptorPool            = m_descriptor_pool;
-        init_info.Subpass                   = _main_camera_subpass_ui;
+        init_info.Subpass                   = 0;
         // may be diffirent from the real swapchain image count // see:
         // ImGui_ImplVulkanH_GetMinImageCountFromPresentMode
         init_info.MinImageCount = 3; // rhi->m_vulkan_manager->m_max_frames_in_flight;

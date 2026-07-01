@@ -79,7 +79,12 @@ namespace Pilot
         static bool m_enable_validation_Layers;
         static bool m_enable_debug_utils_label;
         static bool m_enable_point_light_shadow;
+    private:
+        void setupUICombineRenderPass();
+        void setupUICombineFramebuffers();
 
+        VkRenderPass               m_ui_combine_render_pass = VK_NULL_HANDLE;
+        std::vector<VkFramebuffer> m_ui_combine_framebuffers;
     private:
         glm::mat4 m_prev_proj_view_matrix = glm::mat4(1.0f);
     private:

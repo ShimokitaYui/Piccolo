@@ -9,10 +9,11 @@
 
 namespace Pilot
 {
-    void PMotionBlurPass::initialize(VkImageView  color_attachment,
-                                     VkBuffer     matrix_ubo_buffer)
+    void PMotionBlurPass::initialize(   VkImageView  color_attachment,
+                                        VkImageView  output_attachment,
+                                        VkBuffer     matrix_ubo_buffer)
     {
-        setupAttachments();
+        setupAttachments(VkImageView  output_attachment);
         setupRenderPass();
         setupFramebuffer();
         setupDescriptorSetLayout();
@@ -21,30 +22,12 @@ namespace Pilot
         updateAfterFramebufferRecreate(color_attachment, matrix_ubo_buffer);
     }
 
-    void PMotionBlurPass::setupAttachments()
+    void PMotionBlurPass::setupAttachments(VkImageView  output_attachment)
     { 
         _framebuffer.attachments.resize(1);
-        _framebuffer.attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
-        PVulkanUtil::createImage(m_p_vulkan_context->_physical_device,
-                                 m_p_vulkan_context->_device,
-                                 m_p_vulkan_context->_swapchain_extent.width,
-                                 m_p_vulkan_context->_swapchain_extent.height,
-                                 _framebuffer.attachments[0].format,
-                                 VK_IMAGE_TILING_OPTIMAL,
-                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                 _framebuffer.attachments[0].image,
-                                 _framebuffer.attachments[0].mem,
-                                 0,
-                                 1,
-                                 1);
-        _framebuffer.attachments[0].view = PVulkanUtil::createImageView(m_p_vulkan_context->_device,
-                                                                        _framebuffer.attachments[0].image,
-                                                                        _framebuffer.attachments[0].format,
-                                                                        VK_IMAGE_ASPECT_COLOR_BIT,
-                                                                        VK_IMAGE_VIEW_TYPE_2D,
-                                                                        1,
-                                                                        1);
+        _framebuffer.attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+
+        _framebuffer.attachments[0].view = output_attachment;
     }
 
     void PMotionBlurPass::setupRenderPass() 
@@ -57,7 +40,7 @@ namespace Pilot
         point_color_attachment_description.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
         point_color_attachment_description.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         point_color_attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        point_color_attachment_description.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+        point_color_attachment_description.initialLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         point_color_attachment_description.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkSubpassDescription subpasses[1] = {};

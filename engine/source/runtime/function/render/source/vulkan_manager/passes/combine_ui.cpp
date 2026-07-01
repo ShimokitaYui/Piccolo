@@ -155,8 +155,8 @@ namespace Pilot
 
         VkPipelineDepthStencilStateCreateInfo depth_stencil_create_info {};
         depth_stencil_create_info.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depth_stencil_create_info.depthTestEnable       = VK_TRUE;
-        depth_stencil_create_info.depthWriteEnable      = VK_TRUE;
+        depth_stencil_create_info.depthTestEnable       = VK_FALSE;
+        depth_stencil_create_info.depthWriteEnable      = VK_FALSE;
         depth_stencil_create_info.depthCompareOp        = VK_COMPARE_OP_LESS;
         depth_stencil_create_info.depthBoundsTestEnable = VK_FALSE;
         depth_stencil_create_info.stencilTestEnable     = VK_FALSE;
@@ -181,7 +181,7 @@ namespace Pilot
         pipelineInfo.pDepthStencilState  = &depth_stencil_create_info;
         pipelineInfo.layout              = _render_pipelines[0].layout;
         pipelineInfo.renderPass          = _framebuffer.render_pass;
-        pipelineInfo.subpass             = _main_camera_subpass_combine_ui;
+        pipelineInfo.subpass             = 1;
         pipelineInfo.basePipelineHandle  = VK_NULL_HANDLE;
         pipelineInfo.pDynamicState       = &dynamic_state_create_info;
 

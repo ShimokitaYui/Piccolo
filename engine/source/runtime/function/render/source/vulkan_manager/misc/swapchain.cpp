@@ -30,9 +30,10 @@ bool Pilot::PVulkanManager::recreateSwapChain()
     m_tone_mapping_pass.updateAfterFramebufferRecreate(m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd]);
     m_color_grading_pass.updateAfterFramebufferRecreate(m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
     PMotionBlurPass::setContext(helper_info);
-    m_motion_blur_pass.updateAfterFramebufferRecreate(
-        m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd],
-        m_global_render_resource._storage_buffer._global_upload_ringbuffer);
+    m_motion_blur_pass.initialize(
+        m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd],   // 场景输入
+        m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even],  // 运动模糊输出
+        m_global_render_resource._storage_buffer._global_upload_ringbuffer);                   // UBO
     m_combine_ui_pass.updateAfterFramebufferRecreate(m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd], m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
     m_mouse_pick_pass.recreateFramebuffer();
 

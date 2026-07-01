@@ -16,7 +16,7 @@ namespace Pilot
     class PMotionBlurPass : public PRenderPassBase
     {
         public:
-            void initialize(VkImageView color_attachment, VkBuffer matrix_ubo_buffer);
+            void initialize(VkImageView color_attachment, VkImageView  output_attachment, VkBuffer matrix_ubo_buffer);
             void draw();
 
             void updateAfterFramebufferRecreate(VkImageView color_attachment,
@@ -99,9 +99,8 @@ namespace Pilot
         _main_camera_pass_backup_buffer_odd       = 3,
         _main_camera_pass_backup_buffer_even      = 4,
         _main_camera_pass_depth                   = 5,
-        _main_camera_pass_swap_chain_image        = 6,
         _main_camera_pass_custom_attachment_count = 5,
-        _main_camera_pass_attachment_count        = 7,
+        _main_camera_pass_attachment_count        = 6,
     };
 
     enum
@@ -111,8 +110,6 @@ namespace Pilot
         _main_camera_subpass_forward_lighting,
         _main_camera_subpass_tone_mapping,
         _main_camera_subpass_color_grading,
-        _main_camera_subpass_ui,
-        _main_camera_subpass_combine_ui,
         _main_camera_subpass_count
     };
 
@@ -156,19 +153,11 @@ namespace Pilot
         void initialize();
 
         void draw(PColorGradingPass& color_grading_pass,
-                  PToneMappingPass&  tone_mapping_pass,
-                  PUIPass&           ui_pass,
-                  PCombineUIPass&    combine_ui_pass,
-                  uint32_t           current_swapchain_image_index,
-                  void*              ui_state);
+                  PToneMappingPass&  tone_mapping_pass);
 
         // legacy
         void drawForward(PColorGradingPass& color_grading_pass,
-                         PToneMappingPass&  tone_mapping_pass,
-                         PUIPass&           ui_pass,
-                         PCombineUIPass&    combine_ui_pass,
-                         uint32_t           current_swapchain_image_index,
-                         void*              ui_state);
+                         PToneMappingPass&  tone_mapping_pass);
 
         void setHelperInfo(const PLightPassHelperInfo& helper_info);
 
@@ -205,7 +194,6 @@ namespace Pilot
     private:
         VkImageView                m_point_light_shadow_color_image_view;
         VkImageView                m_directional_light_shadow_color_image_view;
-        std::vector<VkFramebuffer> m_swapchain_framebuffers;
     };
 
 } // namespace Pilot

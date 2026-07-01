@@ -265,6 +265,7 @@ void Pilot::PVulkanManager::renderFrameForward(class Scene&                scene
     m_main_camera_pass.drawForward(
         m_color_grading_pass, m_tone_mapping_pass, m_ui_pass, m_combine_ui_pass, current_swapchain_image_index, ui_state);
 
+    m_motion_blur_pass.draw();
     // end command buffer
     VkResult res_end_command_buffer = m_vulkan_context._vkEndCommandBuffer(m_command_buffers[m_current_frame_index]);
     assert(VK_SUCCESS == res_end_command_buffer);
@@ -427,4 +428,28 @@ void Pilot::PVulkanManager::clear()
     vkDestroyInstance(m_vulkan_context._instance,
                       nullptr); // when vulkan instance is cleared, so is
                                 // m_vulkan_context._physical_device
+}
+
+void Pilot::PVulkanManager::setupUICombineFramebuffers()
+{
+    m_ui_combine_framebuffers.resize(m_vulkan_context._swapchain_imageviews.size());
+    for (size_t i = 0; i < m_vulkan_context._swapchain_imageviews.size(); i++)
+    {
+        VkImageView views[3] = {
+            m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd],
+            m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even],
+            m_vulkan_context._swapchain_imageviews[i],
+        };
+        VkFramebufferCreateInfo fb = {};
+        fb.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        fb.renderPass = m_ui_combine_render_pass;
+        fb.attachmentCount = 3;
+        fb.pAttachments = views;
+        fb.width  = m_vulkan_context._swapchain_extent.width;
+        fb.height = m_vulkan_context._swapchain_extent.height;
+        fb.layers = 1;
+        if (vkCreateFramebuffer(m_vulkan_context._device, &fb, nullptr,
+                                &m_ui_combine_framebuffers[i]) != VK_SUCCESS)
+            throw std::runtime_error("create UI combine framebuffer");
+    }
 }
