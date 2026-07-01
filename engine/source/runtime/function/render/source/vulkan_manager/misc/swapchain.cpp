@@ -11,6 +11,10 @@ bool Pilot::PVulkanManager::recreateSwapChain()
         glfwGetFramebufferSize(m_vulkan_context._window, &width, &height);
         glfwWaitEvents();
     }
+    PRenderPassHelperInfo helper_info {};
+    helper_info.p_context                = &m_vulkan_context;
+    helper_info.descriptor_pool          = m_descriptor_pool;
+    helper_info.p_global_render_resource = &m_global_render_resource;
 
     VkResult res_wait_for_fences = m_vulkan_context._vkWaitForFences(
         m_vulkan_context._device, m_max_frames_in_flight, m_is_frame_in_flight_fences, VK_TRUE, UINT64_MAX);
@@ -25,6 +29,10 @@ bool Pilot::PVulkanManager::recreateSwapChain()
     m_main_camera_pass.updateAfterFramebufferRecreate();
     m_tone_mapping_pass.updateAfterFramebufferRecreate(m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd]);
     m_color_grading_pass.updateAfterFramebufferRecreate(m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
+    PMotionBlurPass::setContext(helper_info);
+    m_motion_blur_pass.updateAfterFramebufferRecreate(
+        m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd],
+        m_global_render_resource._storage_buffer._global_upload_ringbuffer);
     m_combine_ui_pass.updateAfterFramebufferRecreate(m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd], m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
     m_mouse_pick_pass.recreateFramebuffer();
 

@@ -7,10 +7,13 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 
+#include <glm/glm.hpp>
+
 #include <optional>
 #include <vector>
 
 #include <vk_mem_alloc.h>
+#include <glm/glm.hpp>
 
 namespace Pilot
 {

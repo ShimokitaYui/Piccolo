@@ -34,10 +34,8 @@ bool Pilot::PVulkanManager::initializeRenderPass()
     m_color_grading_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
 
     PMotionBlurPass::setContext(helper_info);
-    VkBuffer global_ring_buffer = m_global_render_resource._storage_buffer._global_upload_ringbuffer;
-    m_motion_blur_pass.initialize(m_main_camera_pass.getRenderPass(),
-                                  m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even],
-                                  global_ring_buffer);
+    m_motion_blur_pass.initialize(m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd],
+                                  m_global_render_resource._storage_buffer._global_upload_ringbuffer);
 
     m_ui_pass.initialize(m_main_camera_pass.getRenderPass());
 

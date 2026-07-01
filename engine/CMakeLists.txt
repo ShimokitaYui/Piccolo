@@ -5,7 +5,7 @@ set(ENGINE_ASSET_DIR "/asset")
 set(ENGINE_SCHEMA_DIR "/schema")
 
 if(MSVC)
-    add_compile_options("/MP")
+    add_compile_options("/MP4")
     set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PilotEditor)
 endif()
 

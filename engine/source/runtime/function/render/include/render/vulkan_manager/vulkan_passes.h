@@ -16,14 +16,16 @@ namespace Pilot
     class PMotionBlurPass : public PRenderPassBase
     {
         public:
-            void initialize(VkRenderPass render_pass, VkImageView color_attachment, VkBuffer matrix_ubo_buffer);
+            void initialize(VkImageView color_attachment, VkBuffer matrix_ubo_buffer);
             void draw();
 
             void updateAfterFramebufferRecreate(VkImageView color_attachment,
-                                                VkImageView depth_attachment,
                                                 VkBuffer    matrix_ubo_buffer);
             void setDynamicOffset(uint32_t offset);
         private:
+            void setupAttachments();
+            void setupRenderPass(); 
+            void setupFramebuffer();
             void setupDescriptorSetLayout();
             void setupPipelines();
             void setupDescriptorSet();
@@ -109,7 +111,6 @@ namespace Pilot
         _main_camera_subpass_forward_lighting,
         _main_camera_subpass_tone_mapping,
         _main_camera_subpass_color_grading,
-        _main_camera_subpass_motion_blur,
         _main_camera_subpass_ui,
         _main_camera_subpass_combine_ui,
         _main_camera_subpass_count

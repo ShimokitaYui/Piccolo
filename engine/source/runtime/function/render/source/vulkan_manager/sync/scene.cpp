@@ -58,10 +58,11 @@ void Pilot::PVulkanManager::cullingAndSyncScene(class Scene&                scen
     }
 
     culling(scene, pilot_renderer, release_handles);
+
     glm::mat4 inv_current_proj_view = glm::inverse(proj_view_matrix);
     uint32_t motion_blur_dynamic_offset = roundUp(
         m_global_render_resource._storage_buffer._global_upload_ringbuffers_end[m_current_frame_index],
-        m_global_render_resource._storage_buffer._min_storage_buffer_offset_alignment);
+        m_global_render_resource._storage_buffer._min_uniform_buffer_offset_alignment);
     m_global_render_resource._storage_buffer._global_upload_ringbuffers_end[m_current_frame_index] =
         motion_blur_dynamic_offset + sizeof(MotionBlurUBO);
     assert(m_global_render_resource._storage_buffer._global_upload_ringbuffers_end[m_current_frame_index] <=
@@ -70,11 +71,12 @@ void Pilot::PVulkanManager::cullingAndSyncScene(class Scene&                scen
     MotionBlurUBO* dst_motion_blur_ubo_ptr = reinterpret_cast<MotionBlurUBO*>(
         reinterpret_cast<uintptr_t>(m_global_render_resource._storage_buffer._global_upload_ringbuffer_memory_pointer) +
         motion_blur_dynamic_offset);
-    dst_motion_blur_ubo_ptr->inv_CurrentVP = glm::inverse(proj_view_matrix);
+    dst_motion_blur_ubo_ptr->inv_CurrentVP = inv_current_proj_view;
     dst_motion_blur_ubo_ptr->prev_VP       = m_prev_proj_view_matrix;
     dst_motion_blur_ubo_ptr->blurScale     = 1.0f;
     m_motion_blur_pass.setDynamicOffset(motion_blur_dynamic_offset);
     m_prev_proj_view_matrix = proj_view_matrix;
+
     // set perframe ubo data
     {
         m_main_camera_pass.m_is_show_axis                        = m_is_show_axis;
