@@ -20,7 +20,7 @@ bool Pilot::PVulkanManager::initializeRenderPass()
         m_directional_light_shadow_pass._framebuffer.attachments[0].view;
     m_main_camera_pass.setHelperInfo(light_pass_helper_info);
     m_main_camera_pass.initialize();
-
+    
     auto descriptor_layouts = m_main_camera_pass.getDescriptorSetLayouts();
 
     m_point_light_shadow_pass._per_mesh_layout       = descriptor_layouts[PMainCameraPass::LayoutType::_per_mesh];
@@ -32,6 +32,12 @@ bool Pilot::PVulkanManager::initializeRenderPass()
     m_tone_mapping_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd]);
 
     m_color_grading_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
+
+    PMotionBlurPass::setContext(helper_info);
+    VkBuffer global_ring_buffer = m_global_render_resource._storage_buffer._global_upload_ringbuffer;
+    m_motion_blur_pass.initialize(m_main_camera_pass.getRenderPass(),
+                                  m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even],
+                                  global_ring_buffer);
 
     m_ui_pass.initialize(m_main_camera_pass.getRenderPass());
 

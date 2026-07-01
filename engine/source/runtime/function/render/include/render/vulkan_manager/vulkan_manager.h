@@ -81,6 +81,8 @@ namespace Pilot
         static bool m_enable_point_light_shadow;
 
     private:
+        glm::mat4 m_prev_proj_view_matrix = glm::mat4(1.0f);
+    private:
         // initialize render passes
         bool initializeRenderPass();
         // initialize command pool
@@ -119,6 +121,7 @@ namespace Pilot
         PMainCameraPass             m_main_camera_pass;
         PColorGradingPass           m_color_grading_pass;
         PToneMappingPass            m_tone_mapping_pass;
+        PMotionBlurPass             m_motion_blur_pass;
         PUIPass                     m_ui_pass;
         PCombineUIPass              m_combine_ui_pass;
         PPickPass                   m_mouse_pick_pass;

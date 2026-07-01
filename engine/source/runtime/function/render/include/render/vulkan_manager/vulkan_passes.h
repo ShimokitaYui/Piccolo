@@ -13,20 +13,21 @@ namespace Pilot
         VkImageView directional_light_shadow_color_image_view;
     };
 
-    class PMitonBlurPass : public PRenderPassBase
+    class PMotionBlurPass : public PRenderPassBase
     {
         public:
-            void initialize(VkRenderPass render_pass, VkImageView color_attachment, VkImageView depth_attachment, VkBuffer matrix_ubo_buffer);
+            void initialize(VkRenderPass render_pass, VkImageView color_attachment, VkBuffer matrix_ubo_buffer);
             void draw();
 
             void updateAfterFramebufferRecreate(VkImageView color_attachment,
                                                 VkImageView depth_attachment,
                                                 VkBuffer    matrix_ubo_buffer);
-
+            void setDynamicOffset(uint32_t offset);
         private:
             void setupDescriptorSetLayout();
             void setupPipelines();
             void setupDescriptorSet();
+            uint32_t m_dynamic_offset = 0;
     };
 
     class PColorGradingPass : public PRenderPassBase

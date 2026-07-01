@@ -8,19 +8,18 @@
 
 namespace Pilot
 {
-    void PMitonBlurPass::initialize(VkRenderPass render_pass,
+    void PMotionBlurPass::initialize(VkRenderPass render_pass,
                                     VkImageView  color_attachment,
-                                    VkImageView  depth_attachment,
                                     VkBuffer     matrix_ubo_buffer)
     {
         _framebuffer.render_pass = render_pass;
         setupDescriptorSetLayout();
         setupPipelines();
         setupDescriptorSet();
-        updateAfterFramebufferRecreate(color_attachment, depth_attachment, matrix_ubo_buffer);
+        updateAfterFramebufferRecreate(color_attachment, m_p_vulkan_context->_depth_image_view, matrix_ubo_buffer);
     }
 
-    void PMitonBlurPass::setupDescriptorSetLayout() 
+    void PMotionBlurPass::setupDescriptorSetLayout() 
     { 
         _descriptor_infos.resize(1);
         VkDescriptorSetLayoutBinding post_process_global_layout_bindings[3] = {};
@@ -63,7 +62,7 @@ namespace Pilot
         }
     }
 
-    void PMitonBlurPass::setupPipelines() 
+    void PMotionBlurPass::setupPipelines() 
     { 
         _render_pipelines.resize(1);
 
@@ -204,7 +203,7 @@ namespace Pilot
         vkDestroyShaderModule(m_p_vulkan_context->_device, motion_blur_shader_module, nullptr);
     }
 
-    void PMitonBlurPass::setupDescriptorSet()
+    void PMotionBlurPass::setupDescriptorSet()
     {
         VkDescriptorSetAllocateInfo post_process_global_descriptor_set_alloc_info;
         post_process_global_descriptor_set_alloc_info.sType          = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -221,27 +220,27 @@ namespace Pilot
         }
     }
 
-    void PMitonBlurPass::updateAfterFramebufferRecreate(
+    void PMotionBlurPass::updateAfterFramebufferRecreate(
         VkImageView color_attachment,
         VkImageView depth_attachment,
         VkBuffer    matrix_ubo_buffer)
     {
         VkDescriptorImageInfo post_process_per_frame_color_attachment_info = {};
         post_process_per_frame_color_attachment_info.sampler =
-            PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
+            PVulkanUtil::getOrCreateLinearSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
         post_process_per_frame_color_attachment_info.imageView = color_attachment;
         post_process_per_frame_color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkDescriptorImageInfo post_process_per_frame_depth_attachment_info = {};
-        post_process_per_frame_color_attachment_info.sampler =
+        post_process_per_frame_depth_attachment_info.sampler =
             PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        post_process_per_frame_color_attachment_info.imageView   = depth_attachment;
-        post_process_per_frame_color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        post_process_per_frame_depth_attachment_info.imageView   = depth_attachment;
+        post_process_per_frame_depth_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkDescriptorBufferInfo post_process_per_frame_matrix_ubo_buffer_info = {};
         post_process_per_frame_matrix_ubo_buffer_info.buffer                 = matrix_ubo_buffer;
         post_process_per_frame_matrix_ubo_buffer_info.offset                 = 0;
-        post_process_per_frame_matrix_ubo_buffer_info.range                  = 0;//TODO
+        post_process_per_frame_matrix_ubo_buffer_info.range                  = sizeof(MotionBlurUBO);
 
         VkWriteDescriptorSet post_process_descriptor_writes_info[3];
 
@@ -277,5 +276,43 @@ namespace Pilot
         post_process_descriptor_depth_attachment_write_info.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         post_process_descriptor_depth_attachment_write_info.descriptorCount = 1;
         post_process_descriptor_depth_attachment_write_info.pImageInfo = &post_process_per_frame_depth_attachment_info;
+
+        vkUpdateDescriptorSets(m_p_vulkan_context->_device,
+                       sizeof(post_process_descriptor_writes_info) /
+                           sizeof(post_process_descriptor_writes_info[0]),
+                       post_process_descriptor_writes_info,
+                       0,
+                       NULL);
     }
-}
+
+    void PMotionBlurPass::setDynamicOffset(uint32_t offset) 
+    { 
+        m_dynamic_offset = offset; 
+    }
+
+    void PMotionBlurPass::draw()
+    {
+        if (m_render_config._enable_debug_untils_label)
+        {
+            VkDebugUtilsLabelEXT label_info = {
+                VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "Motion Blur", {1.0f, 1.0f, 1.0f, 1.0f}};
+            m_p_vulkan_context->_vkCmdBeginDebugUtilsLabelEXT(m_command_info._current_command_buffer, &label_info);
+        }
+        m_p_vulkan_context->_vkCmdBindPipeline(
+            m_command_info._current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _render_pipelines[0].pipeline);
+        m_p_vulkan_context->_vkCmdSetViewport(m_command_info._current_command_buffer, 0, 1, &m_command_info._viewport);
+        m_p_vulkan_context->_vkCmdSetScissor(m_command_info._current_command_buffer, 0, 1, &m_command_info._scissor);
+        m_p_vulkan_context->_vkCmdBindDescriptorSets(m_command_info._current_command_buffer,
+                                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                     _render_pipelines[0].layout,
+                                                     0,
+                                                     1,
+                                                     &_descriptor_infos[0].descriptor_set,
+                                                     1,
+                                                     &m_dynamic_offset);
+        vkCmdDraw(m_command_info._current_command_buffer, 3, 1, 0, 0);
+        if (m_render_config._enable_debug_untils_label)
+        {
+            m_p_vulkan_context->_vkCmdEndDebugUtilsLabelEXT(m_command_info._current_command_buffer);
+        }
+    }

@@ -14,6 +14,15 @@
 
 namespace Pilot
 {
+
+    struct MotionBlurUBO
+    {
+        glm::mat4 inv_CurrentVP;
+        glm::mat4 prev_VP;
+        float     blurScale;
+        float     padding[3];
+    };
+
     struct QueueFamilyIndices
     {
         std::optional<uint32_t> graphicsFamily;
