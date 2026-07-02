@@ -13,7 +13,7 @@ namespace Pilot
                                         VkImageView  output_attachment,
                                         VkBuffer     matrix_ubo_buffer)
     {
-        setupAttachments(VkImageView  output_attachment);
+        setupAttachments(output_attachment);
         setupRenderPass();
         setupFramebuffer();
         setupDescriptorSetLayout();
@@ -22,16 +22,35 @@ namespace Pilot
         updateAfterFramebufferRecreate(color_attachment, matrix_ubo_buffer);
     }
 
+    void PMotionBlurPass::updatePassAfterFramebufferRecreate(  VkImageView color_attachment,
+                                        VkImageView output_attachment,
+                                        VkBuffer matrix_ubo_buffer)
+    {
+        clearFrameBuffer();
+        setupAttachments(output_attachment);
+        setupFramebuffer();
+        updateAfterFramebufferRecreate(color_attachment, matrix_ubo_buffer);
+    }
+
+    void PMotionBlurPass::clearFrameBuffer()
+    {
+        if (_framebuffer.framebuffer != VK_NULL_HANDLE)
+        {
+            vkDestroyFramebuffer(m_p_vulkan_context->_device, _framebuffer.framebuffer, nullptr);
+            _framebuffer.framebuffer = VK_NULL_HANDLE;
+        }
+    }
+
     void PMotionBlurPass::setupAttachments(VkImageView  output_attachment)
-    { 
+    {
         _framebuffer.attachments.resize(1);
         _framebuffer.attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
         _framebuffer.attachments[0].view = output_attachment;
     }
 
-    void PMotionBlurPass::setupRenderPass() 
-    { 
+    void PMotionBlurPass::setupRenderPass()
+    {
         VkAttachmentDescription attachments[1] = {};
         VkAttachmentDescription& point_color_attachment_description = attachments[0];
         point_color_attachment_description.format         = _framebuffer.attachments[0].format;
@@ -57,10 +76,10 @@ namespace Pilot
 
         dependencies[0].srcSubpass      = VK_SUBPASS_EXTERNAL;
         dependencies[0].dstSubpass      = 0;
-        dependencies[0].srcStageMask    = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[0].dstStageMask    = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        dependencies[0].srcAccessMask   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        dependencies[0].dstAccessMask   = VK_ACCESS_SHADER_READ_BIT;
+        dependencies[0].srcStageMask    = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependencies[0].dstStageMask    = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependencies[0].srcAccessMask   = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependencies[0].dstAccessMask   = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
         dependencies[1].srcSubpass      = 0;

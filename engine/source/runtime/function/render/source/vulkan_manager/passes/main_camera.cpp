@@ -31,8 +31,8 @@ namespace Pilot
         setupPipelines();
         setupDescriptorSet();
         setupFramebufferDescriptorSet();
-        setupSwapchainFramebuffers();
     }
+
     void PMainCameraPass::setupFramebuffer()
     {
         VkImageView attachments[_main_camera_pass_attachment_count] = {
@@ -83,7 +83,7 @@ namespace Pilot
                         _framebuffer.attachments[i].format,
                         VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+                            VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                         _framebuffer.attachments[i].image,
                         _framebuffer.attachments[i].mem,
@@ -163,7 +163,7 @@ namespace Pilot
             _framebuffer.attachments[_main_camera_pass_backup_buffer_odd].format;
         backup_odd_color_attachment_description.samples        = VK_SAMPLE_COUNT_1_BIT;
         backup_odd_color_attachment_description.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        backup_odd_color_attachment_description.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        backup_odd_color_attachment_description.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
         backup_odd_color_attachment_description.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         backup_odd_color_attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         backup_odd_color_attachment_description.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -185,11 +185,11 @@ namespace Pilot
         depth_attachment_description.format                   = m_p_vulkan_context->_depth_image_format;
         depth_attachment_description.samples                  = VK_SAMPLE_COUNT_1_BIT;
         depth_attachment_description.loadOp                   = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depth_attachment_description.storeOp                  = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depth_attachment_description.storeOp                  = VK_ATTACHMENT_STORE_OP_STORE;
         depth_attachment_description.stencilLoadOp            = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         depth_attachment_description.stencilStoreOp           = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depth_attachment_description.initialLayout            = VK_IMAGE_LAYOUT_UNDEFINED;
-        depth_attachment_description.finalLayout              = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depth_attachment_description.finalLayout              = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkSubpassDescription subpasses[_main_camera_subpass_count] = {};
 
@@ -2125,11 +2125,7 @@ namespace Pilot
     }
 
     void PMainCameraPass::drawForward(PColorGradingPass& color_grading_pass,
-                                      PToneMappingPass&  tone_mapping_pass,
-                                      PUIPass&           ui_pass,
-                                      PCombineUIPass&    combine_ui_pass,
-                                      uint32_t           current_swapchain_image_index,
-                                      void*              ui_state)
+                                      PToneMappingPass&  tone_mapping_pass)
     {
         {
             VkRenderPassBeginInfo renderpass_begin_info {};
@@ -2146,7 +2142,6 @@ namespace Pilot
             clear_values[_main_camera_pass_backup_buffer_odd].color  = {{0.0f, 0.0f, 0.0f, 1.0f}};
             clear_values[_main_camera_pass_backup_buffer_even].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
             clear_values[_main_camera_pass_depth].depthStencil       = {1.0f, 0};
-            clear_values[_main_camera_pass_swap_chain_image].color   = {{0.0f, 0.0f, 0.0f, 1.0f}};
             renderpass_begin_info.clearValueCount                    = (sizeof(clear_values) / sizeof(clear_values[0]));
             renderpass_begin_info.pClearValues                       = clear_values;
 

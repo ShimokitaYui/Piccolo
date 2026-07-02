@@ -73,6 +73,11 @@ void Pilot::PVulkanManager::cullingAndSyncScene(class Scene&                scen
         motion_blur_dynamic_offset);
     dst_motion_blur_ubo_ptr->inv_CurrentVP = inv_current_proj_view;
     dst_motion_blur_ubo_ptr->prev_VP       = m_prev_proj_view_matrix;
+    dst_motion_blur_ubo_ptr->viewportRect  = glm::vec4(m_viewport.x, m_viewport.y, m_viewport.width, m_viewport.height);
+    dst_motion_blur_ubo_ptr->targetSize    = glm::vec4(static_cast<float>(m_vulkan_context._swapchain_extent.width),
+                                                    static_cast<float>(m_vulkan_context._swapchain_extent.height),
+                                                    0.0f,
+                                                    0.0f);
     dst_motion_blur_ubo_ptr->blurScale     = 1.0f;
     m_motion_blur_pass.setDynamicOffset(motion_blur_dynamic_offset);
     m_prev_proj_view_matrix = proj_view_matrix;

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_common.h"
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_context.h"
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_directional_light_pass.h"
@@ -22,9 +24,13 @@ namespace Pilot
             void updateAfterFramebufferRecreate(VkImageView color_attachment,
                                                 VkBuffer    matrix_ubo_buffer);
             void setDynamicOffset(uint32_t offset);
+
+            void updatePassAfterFramebufferRecreate(VkImageView color_attachment, VkImageView  output_attachment, VkBuffer matrix_ubo_buffer);
+
+            void clearFrameBuffer();
         private:
-            void setupAttachments();
-            void setupRenderPass(); 
+            void setupAttachments(VkImageView output_attachment);
+            void setupRenderPass();
             void setupFramebuffer();
             void setupDescriptorSetLayout();
             void setupPipelines();
@@ -172,12 +178,12 @@ namespace Pilot
     private:
         void setupAttachments();
         void setupRenderPass();
+        void setupFramebuffer();
         void setupDescriptorSetLayout();
         void setupPipelines();
         void setupDescriptorSet();
         void setupFramebufferDescriptorSet();
-        void setupSwapchainFramebuffers();
-
+        void setupSceneFramebuffer();
         void setupModelGlobalDescriptorSet();
         void setupSkyboxDescriptorSet();
         void setupAxisDescriptorSet();

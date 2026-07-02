@@ -80,9 +80,10 @@ namespace Pilot
         static bool m_enable_debug_utils_label;
         static bool m_enable_point_light_shadow;
     private:
+        void drawUICombinePass(uint32_t current_swapchain_image_index, void* ui_state);
         void setupUICombineRenderPass();
         void setupUICombineFramebuffers();
-
+        void clearUICombineFramebuffers();
         VkRenderPass               m_ui_combine_render_pass = VK_NULL_HANDLE;
         std::vector<VkFramebuffer> m_ui_combine_framebuffers;
     private:

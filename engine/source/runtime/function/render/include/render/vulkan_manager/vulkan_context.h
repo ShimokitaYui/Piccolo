@@ -22,6 +22,8 @@ namespace Pilot
     {
         glm::mat4 inv_CurrentVP;
         glm::mat4 prev_VP;
+        glm::vec4 viewportRect;
+        glm::vec4 targetSize;
         float     blurScale;
         float     padding[3];
     };

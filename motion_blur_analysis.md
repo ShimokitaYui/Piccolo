@@ -1,331 +1,364 @@
-# 运动模糊（Motion Blur）无效分析报告
+﻿# Motion Blur 实现进度校验
 
-## 当前进度
+更新日期：2026-07-02
 
-| 步骤 | 状态 | 说明 |
-|------|------|------|
-| ① Backup Buffer 添加 SAMPLED_BIT | ✅ | main_camera.cpp:52-87 |
-| ② 枚举修改 (vulkan_passes.h) | ✅ | attachment 7→6, subpass 7→5 |
-| ③ setupRenderPass() 删减 | ⚠️ |**残留 dependencies[5][6]** |
-| ④a draw() 简化 | ✅ | 单 framebuffer, ColorGrading 后结束 |
-| ④b drawForward() 简化 | ❌ | 仍为旧签名 + 旧函数体 |
-| ④c axis pipeline subpass | ❌ | line 1596 引用已删除枚举 |
-| ⑤ PUIPass subpass 索引 | ✅ | init_info.Subpass=0 |
-| ⑥ PCombineUIPass | ⚠️ | subpass=1 ✅, depth test 还是 TRUE |
-| ⑦ MotionBlur 输出目标 | ✅ | 3 参数 + external imageView |
-| ⑧ RP3 创建 | ❌ | 未开始 |
-| ⑨ renderFrame() 编排 | ❌ | 仍为旧 6 参数调用 |
-| ⑩ renderFrameForward() | ❌ | 同上 |
-| ⑪ recreateSwapChain() | ❌ | initialize→updateAfterFramebufferRecreate 错误 |
-| ⑫ initializeRenderPass() | ❌ | 未调用 RP3 创建 |
-| ⑬ cleanup RP3 | ❌ | 未实现 |
+本文按当前源码状态校验 motion blur 接入进度，并给出后续修改顺序。当前实现已经有 motion blur pass、shader、UBO 同步和部分 render pass 拆分，但主渲染链路还没有完整接通，当前状态更接近“半成品/编译修复阶段”。
 
----
+## 总体结论
 
-## 当前编译错误（7 处）
+| 维度 | 估计进度 | 说明 |
+| --- | ---: | --- |
+| 资源准备 | 70% | backup buffer 已可采样，depth 也已有 sampled usage |
+| MotionBlur pass 雏形 | 55% | C++/shader 已存在，但有声明不一致和语法错误 |
+| 主渲染链路接入 | 35% | MainCamera -> MotionBlur -> UI/CombineUI -> Swapchain 尚未真正串起来 |
+| Swapchain 重建/清理 | 25% | recreate 和 cleanup 还缺 motion blur/RP3 资源生命周期处理 |
+| 可运行效果 | 0%-10% | 当前存在编译级阻塞，尚不能稳定看到效果 |
 
-| 文件 | 行 | 引用 | 修复 |
-|------|-----|------|------|
-| main_camera.cpp | 373 | `_main_camera_subpass_ui` | 删 dependencies[5] |
-| main_camera.cpp | 385 | `_main_camera_subpass_ui` | 删 dependencies[6] |
-| main_camera.cpp | 386 | `_main_camera_subpass_combine_ui` | 删 dependencies[6] |
-| main_camera.cpp | 1596 | `_main_camera_subpass_ui` | 改 forward_lighting |
-| main_camera.cpp | 2175 | `_main_camera_pass_swap_chain_image` | 删此行 |
-| vulkan_manager.cpp | 132 | draw() 旧 6 参数 | 改 2 参数+RP3 |
-| vulkan_manager.cpp | 265 | drawForward() 旧 6 参数 | 改 2 参数+RP3 |
+整体完成度约 **45%**。下一阶段优先目标不是调 shader 效果，而是先让项目能编译，并让 motion blur 输出真正进入最终 swapchain。
 
----
+## 已完成项
 
-## 步骤 ③：setupRenderPass 残留修复
+| 项目 | 状态 | 位置/说明 |
+| --- | --- | --- |
+| backup odd/even 添加 `VK_IMAGE_USAGE_SAMPLED_BIT` | 已完成 | `main_camera.cpp:85-86` |
+| MainCamera attachment/subpass 数量缩减 | 基本完成 | `vulkan_passes.h` 已无 UI/CombineUI subpass |
+| MainCamera render pass dependencies 缩减为 5 个 | 已完成 | `main_camera.cpp:308` |
+| Axis pipeline subpass 修复 | 已完成 | 当前使用 `_main_camera_subpass_forward_lighting` |
+| `MotionBlurUBO` 定义 | 已完成 | `vulkan_context.h` |
+| 当前/上一帧 VP 矩阵同步 | 已完成 | `sync/scene.cpp` |
+| `motion_blur.frag` | 已完成雏形 | 屏幕空间基于 depth 重建 world position |
+| `PMotionBlurPass` 文件 | 已完成雏形 | `passes/motion_blur.cpp` |
+| RP3 UI+CombineUI render pass 代码 | 已写入但未正确接入 | `render_passes.cpp` |
+| CombineUI depth test | 已修复 | 当前 `depthTestEnable/depthWriteEnable` 均为 `VK_FALSE` |
 
-**文件**: [main_camera.cpp:308,371-395](engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L308)
+## 当前阻塞问题
+
+这些问题需要先修，否则后续效果调试没有意义。
+
+### 1. `PMotionBlurPass::setupAttachments` 声明/定义不一致
+
+文件：
+
+- `engine/source/runtime/function/render/include/render/vulkan_manager/vulkan_passes.h`
+- `engine/source/runtime/function/render/source/vulkan_manager/passes/motion_blur.cpp`
+
+当前头文件声明：
 
 ```cpp
-// 当前:
-VkSubpassDependency dependencies[7] = {};
-// ... dependencies[0]~[6] 共 7 个，其中 [5] 和 [6] 引用已删除的枚举
-
-// 修复:
-VkSubpassDependency dependencies[5] = {};
-// 删除 dependencies[5] (color_grading→ui) 和 dependencies[6] (ui→combine_ui)
+void setupAttachments();
 ```
 
----
-
-## 步骤 ④b：drawForward() 修复
-
-**文件**: [main_camera.cpp:2153-2242](engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L2153-L2242)
-
-改为和 `draw()` 一样：2 参数签名，6 个 clear_values，ColorGrading 后直接 `vkCmdEndRenderPass`。删除 UI/Combine 子通道代码和 `_main_camera_pass_swap_chain_image` 引用。
-
----
-
-## 步骤 ④c：Axis Pipeline 修复
-
-**文件**: [main_camera.cpp:1596](engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L1596)
+当前 cpp 定义：
 
 ```cpp
-// 当前: pipelineInfo.subpass = _main_camera_subpass_ui;  // 编译错误
-
-// 修复: pipelineInfo.subpass = _main_camera_subpass_forward_lighting;
-// (Axis 之后在 RP1 Subpass 2 中渲染，或移到 RP3 Subpass 0)
+void PMotionBlurPass::setupAttachments(VkImageView output_attachment)
 ```
 
----
-
-## 步骤 ⑥：CombineUI depth test 修复
-
-**文件**: [combine_ui.cpp:158-159](engine/source/runtime/function/render/source/vulkan_manager/passes/combine_ui.cpp#L158-L159)
+并且 `initialize()` 中还有语法错误：
 
 ```cpp
-// 当前: depthTestEnable = VK_TRUE; depthWriteEnable = VK_TRUE;
-
-// 修复: depthTestEnable = VK_FALSE; depthWriteEnable = VK_FALSE;
-// RP3 无 depth attachment，depth test 必须关闭
+setupAttachments(VkImageView output_attachment);
 ```
 
----
-
-## 步骤 ⑧：RP3 封装为独立函数
-
-### vulkan_manager.h 声明
+应改为：
 
 ```cpp
-private:
-    void setupUICombineRenderPass();
-    void setupUICombineFramebuffers();
+// vulkan_passes.h
+void setupAttachments(VkImageView output_attachment);
 
-    VkRenderPass               m_ui_combine_render_pass = VK_NULL_HANDLE;
-    std::vector<VkFramebuffer> m_ui_combine_framebuffers;
+// motion_blur.cpp
+setupAttachments(output_attachment);
 ```
 
-### setupUICombineRenderPass() — 放 render_passes.cpp
+### 2. `renderFrame()` 仍调用旧版 MainCamera draw
 
-只创建 VkRenderPass（一次调用）：
+文件：
+
+- `engine/source/runtime/function/render/source/vulkan_manager/vulkan_manager.cpp`
+
+当前仍然调用：
 
 ```cpp
-void Pilot::PVulkanManager::setupUICombineRenderPass()
-{
-    VkAttachmentDescription attachments[3] = {};
-
-    // [0] backup_odd — UI 写入 + CombineUI input 读
-    attachments[0].format         = VK_FORMAT_R16G16B16A16_SFLOAT;
-    attachments[0].samples        = VK_SAMPLE_COUNT_1_BIT;
-    attachments[0].loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].initialLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    attachments[0].finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    // [1] backup_even — 运动模糊结果，CombineUI input 读
-    attachments[1].format         = VK_FORMAT_R16G16B16A16_SFLOAT;
-    attachments[1].samples        = VK_SAMPLE_COUNT_1_BIT;
-    attachments[1].loadOp         = VK_ATTACHMENT_LOAD_OP_LOAD;   // 关键!
-    attachments[1].storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].initialLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    attachments[1].finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    // [2] swapchain — 最终输出
-    attachments[2].format         = m_vulkan_context._swapchain_image_format;
-    attachments[2].samples        = VK_SAMPLE_COUNT_1_BIT;
-    attachments[2].loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[2].storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[2].stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[2].initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[2].finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    // Subpass 0: UI
-    VkAttachmentReference ui_color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-    VkSubpassDescription ui_sp = {};
-    ui_sp.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    ui_sp.colorAttachmentCount = 1;
-    ui_sp.pColorAttachments    = &ui_color_ref;
-
-    // Subpass 1: CombineUI
-    VkAttachmentReference combine_in_refs[2] = {
-        {1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},  // backup_even→shader binding 0
-        {0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},  // backup_odd →shader binding 1
-    };
-    VkAttachmentReference combine_color_ref = {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-    VkSubpassDescription combine_sp = {};
-    combine_sp.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    combine_sp.inputAttachmentCount = 2;
-    combine_sp.pInputAttachments    = combine_in_refs;
-    combine_sp.colorAttachmentCount = 1;
-    combine_sp.pColorAttachments    = &combine_color_ref;
-
-    VkSubpassDescription subpasses[2] = {ui_sp, combine_sp};
-
-    VkSubpassDependency deps[3] = {};
-    deps[0].srcSubpass    = VK_SUBPASS_EXTERNAL;
-    deps[0].dstSubpass    = 0;
-    deps[0].srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    deps[0].dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    deps[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    deps[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    deps[1].srcSubpass      = 0;
-    deps[1].dstSubpass      = 1;
-    deps[1].srcStageMask    = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    deps[1].dstStageMask    = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    deps[1].srcAccessMask   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    deps[1].dstAccessMask   = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-    deps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-    deps[2].srcSubpass    = 1;
-    deps[2].dstSubpass    = VK_SUBPASS_EXTERNAL;
-    deps[2].srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    deps[2].dstStageMask  = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    deps[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo rp = {};
-    rp.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    rp.attachmentCount = 3;
-    rp.pAttachments    = attachments;
-    rp.subpassCount    = 2;
-    rp.pSubpasses      = subpasses;
-    rp.dependencyCount = 3;
-    rp.pDependencies   = deps;
-
-    if (vkCreateRenderPass(m_vulkan_context._device, &rp, nullptr,
-                           &m_ui_combine_render_pass) != VK_SUCCESS)
-        throw std::runtime_error("create UI combine render pass");
-}
+m_main_camera_pass.draw(
+    m_color_grading_pass,
+    m_tone_mapping_pass,
+    m_ui_pass,
+    m_combine_ui_pass,
+    current_swapchain_image_index,
+    ui_state);
 ```
 
-### setupUICombineFramebuffers() — 放 render_passes.cpp
-
-每次 swapchain 重建时都需要调用：
+但当前 `PMainCameraPass::draw()` 已改为 2 参数：
 
 ```cpp
-void Pilot::PVulkanManager::setupUICombineFramebuffers()
-{
-    m_ui_combine_framebuffers.resize(m_vulkan_context._swapchain_imageviews.size());
-    for (size_t i = 0; i < m_vulkan_context._swapchain_imageviews.size(); i++)
-    {
-        VkImageView views[3] = {
-            m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd],
-            m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even],
-            m_vulkan_context._swapchain_imageviews[i],
-        };
-        VkFramebufferCreateInfo fb = {};
-        fb.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        fb.renderPass = m_ui_combine_render_pass;
-        fb.attachmentCount = 3;
-        fb.pAttachments = views;
-        fb.width  = m_vulkan_context._swapchain_extent.width;
-        fb.height = m_vulkan_context._swapchain_extent.height;
-        fb.layers = 1;
-        if (vkCreateFramebuffer(m_vulkan_context._device, &fb, nullptr,
-                                &m_ui_combine_framebuffers[i]) != VK_SUCCESS)
-            throw std::runtime_error("create UI combine framebuffer");
-    }
-}
+void draw(PColorGradingPass& color_grading_pass,
+          PToneMappingPass& tone_mapping_pass);
 ```
 
----
-
-## 步骤 ⑨：renderFrame() 改为 3-RP
-
-**文件**: [vulkan_manager.cpp:132](engine/source/runtime/function/render/source/vulkan_manager/vulkan_manager.cpp#L132)
+应改为 3-RP 流程：
 
 ```cpp
-// RP1: 场景渲染
+// RP1: Scene -> ToneMapping -> ColorGrading
 m_main_camera_pass.draw(m_color_grading_pass, m_tone_mapping_pass);
 
-// RP2: 运动模糊
+// RP2: Motion Blur
 m_motion_blur_pass.draw();
 
-// RP3: UI + CombineUI → Swapchain
-{
-    VkRenderPassBeginInfo rp = {};
-    rp.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rp.renderPass  = m_ui_combine_render_pass;
-    rp.framebuffer = m_ui_combine_framebuffers[current_swapchain_image_index];
-    rp.renderArea  = {{0, 0}, m_vulkan_context._swapchain_extent};
-
-    VkClearValue cv[3] = {};
-    cv[0].color = {{0,0,0,1}};
-    cv[1].color = {{0,0,0,1}};
-    cv[2].color = {{0,0,0,1}};
-    rp.clearValueCount = 3;
-    rp.pClearValues    = cv;
-
-    m_vulkan_context._vkCmdBeginRenderPass(
-        m_command_buffers[m_current_frame_index], &rp, VK_SUBPASS_CONTENTS_INLINE);
-
-    m_ui_pass.draw(ui_state);
-
-    m_vulkan_context._vkCmdNextSubpass(
-        m_command_buffers[m_current_frame_index], VK_SUBPASS_CONTENTS_INLINE);
-
-    m_combine_ui_pass.draw();
-
-    m_vulkan_context._vkCmdEndRenderPass(m_command_buffers[m_current_frame_index]);
-}
+// RP3: UI -> CombineUI -> Swapchain
+drawUICombinePass(current_swapchain_image_index, ui_state);
 ```
 
----
+可以先不抽函数，直接在 `renderFrame()` 内写 RP3 begin/next/end，等跑通后再整理。
 
-## 步骤 ⑩：renderFrameForward() 同样改为 3-RP
+### 3. `drawForward()` 仍是旧接口
 
-**文件**: [vulkan_manager.cpp:265](engine/source/runtime/function/render/source/vulkan_manager/vulkan_manager.cpp#L265)
+文件：
+
+- `engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp`
+- `engine/source/runtime/function/render/include/render/vulkan_manager/vulkan_passes.h`
+
+头文件里 `drawForward()` 是 2 参数，但 cpp 里仍是 6 参数，并且还引用已删除的：
 
 ```cpp
-m_main_camera_pass.drawForward(m_color_grading_pass, m_tone_mapping_pass);
-m_motion_blur_pass.draw();
-// ... RP3 代码同步骤⑨ ...
+_main_camera_pass_swap_chain_image
 ```
 
----
+应把 `drawForward()` 改成和 `draw()` 一样，只负责 MainCamera render pass，到 ColorGrading 后结束 render pass。UI/CombineUI 统一放到 RP3。
 
-## 步骤 ⑪：recreateSwapChain() 修复
+### 4. `setupUICombineFramebuffers()` 重复定义
 
-**文件**: [swapchain.cpp:33-37](engine/source/runtime/function/render/source/vulkan_manager/misc/swapchain.cpp#L33-L37)
+当前存在两份定义：
 
-3 个修改：
-1. Line 33: `m_motion_blur_pass.initialize(...)` → `updateAfterFramebufferRecreate(...)`
-2. Line 37: CombineUI 参数 swap `(backup_odd, backup_even)` → `(backup_even, backup_odd)`
-3. 新增：销毁旧 RP3 framebuffers + 调用 `setupUICombineFramebuffers()`
+- `render_passes.cpp`
+- `vulkan_manager.cpp`
 
----
+应只保留一份。建议保留在 `render_passes.cpp`，删除 `vulkan_manager.cpp` 文件末尾重复的实现。
 
-## 步骤 ⑫：initializeRenderPass() 调用 RP3
+### 5. RP3 初始化顺序错误
 
-**文件**: [render_passes.cpp:42-44](engine/source/runtime/function/render/source/vulkan_manager/passes/render_passes.cpp#L42-L44)
+当前 `initializeRenderPass()` 中先调用了：
 
 ```cpp
 setupUICombineRenderPass();
 setupUICombineFramebuffers();
+```
+
+然后才调用：
+
+```cpp
+m_main_camera_pass.initialize();
+```
+
+这会导致 RP3 framebuffer 依赖的 backup image view 还没有创建。正确顺序应是：
+
+```cpp
+m_main_camera_pass.initialize();
+
+setupUICombineRenderPass();
+setupUICombineFramebuffers();
 
 m_ui_pass.initialize(m_ui_combine_render_pass);
-m_combine_ui_pass.initialize(m_ui_combine_render_pass,
+m_combine_ui_pass.initialize(
+    m_ui_combine_render_pass,
     m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even],
     m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd]);
 ```
 
----
+注意：这里 CombineUI 的 scene 输入应是 motion blur 输出，即 backup even；UI 输入是 backup odd。
 
-## 步骤 ⑬：cleanup 中销毁 RP3
+### 6. UI/CombineUI 仍绑定 MainCamera render pass
+
+当前代码：
 
 ```cpp
-for (auto fb : m_ui_combine_framebuffers)
-    vkDestroyFramebuffer(m_vulkan_context._device, fb, nullptr);
-m_ui_combine_framebuffers.clear();
-if (m_ui_combine_render_pass != VK_NULL_HANDLE)
-    vkDestroyRenderPass(m_vulkan_context._device, m_ui_combine_render_pass, nullptr);
+m_ui_pass.initialize(m_main_camera_pass.getRenderPass());
+m_combine_ui_pass.initialize(m_main_camera_pass.getRenderPass(), ...);
 ```
 
----
+应改为：
 
-## 注意事项
+```cpp
+m_ui_pass.initialize(m_ui_combine_render_pass);
+m_combine_ui_pass.initialize(m_ui_combine_render_pass, ...);
+```
 
-1. `LOAD_OP_LOAD` 是关键的——RP3 attachment [1] 必须保留 RP2 的运动模糊结果
-2. Render Pass 边界自动 layout transition，无需手动 barrier
-3. 第一帧 `m_prev_proj_view_matrix` 为 identity，第二帧自动修复
-4. `drawAxis()` 需要决定放 RP1 Subpass 2 还是 RP3 Subpass 0
-5. combine_ui.frag **shader 不需要修改**（input_attachment_index 只在子 pass 内引用）
+否则 UI/CombineUI pipeline 的 subpass index 和 render pass 不匹配。
+
+### 7. MotionBlur 输出没有进入 swapchain
+
+当前 `m_motion_blur_pass.draw()` 在 main camera 后执行，但后面没有 RP3 将 motion blur 输出合成到 swapchain。最终 present 的 swapchain image 没有被正确写入，motion blur 结果也不会显示。
+
+需要在 motion blur 后执行 UI+CombineUI：
+
+```cpp
+VkRenderPassBeginInfo rp = {};
+rp.renderPass  = m_ui_combine_render_pass;
+rp.framebuffer = m_ui_combine_framebuffers[current_swapchain_image_index];
+...
+
+vkCmdBeginRenderPass(...);
+m_ui_pass.draw(ui_state);
+vkCmdNextSubpass(...);
+m_combine_ui_pass.draw();
+vkCmdEndRenderPass(...);
+```
+
+### 8. Depth layout 需要给 MotionBlur shader 读取
+
+motion blur shader 使用 sampler 读取 depth：
+
+```glsl
+layout(binding = 1) uniform sampler2D in_DepthTex;
+```
+
+但 MainCamera depth attachment 当前 final layout 是：
+
+```cpp
+VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+```
+
+如果直接跨 render pass 作为 sampler 读取，应该改成：
+
+```cpp
+VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+```
+
+或者在 MainCamera RP 结束后、MotionBlur RP 开始前手动加 image barrier。为了先跑通，建议优先改 final layout。
+
+## 建议修改顺序
+
+### 第一步：修编译错误
+
+1. 修 `PMotionBlurPass::setupAttachments` 声明/调用。
+2. 修改 `renderFrame()` 为 2 参数 MainCamera draw。
+3. 修改 `renderFrameForward()` 为 2 参数 MainCamera drawForward。
+4. 修改 `drawForward()` cpp 签名，删除 `_main_camera_pass_swap_chain_image`。
+5. 删除重复的 `setupUICombineFramebuffers()`。
+
+这一阶段目标：先让 C++ 能编译。
+
+### 第二步：接通 3-RP 渲染链
+
+目标链路：
+
+```text
+RP1 MainCamera:
+  BasePass -> DeferredLighting -> ForwardLighting -> ToneMapping -> ColorGrading
+  output: backup_odd
+
+RP2 MotionBlur:
+  input:  backup_odd + depth + MotionBlurUBO
+  output: backup_even
+
+RP3 UICombine:
+  Subpass 0: UI -> backup_odd
+  Subpass 1: CombineUI reads backup_even + backup_odd -> swapchain
+```
+
+需要改：
+
+1. `initializeRenderPass()` 中 RP3 创建顺序。
+2. `m_ui_pass.initialize()` 使用 `m_ui_combine_render_pass`。
+3. `m_combine_ui_pass.initialize()` 使用 `m_ui_combine_render_pass`。
+4. `renderFrame()` 和 `renderFrameForward()` 在 `m_motion_blur_pass.draw()` 后执行 RP3。
+
+### 第三步：修 swapchain recreate
+
+当前 `recreateSwapChain()` 中重新调用了：
+
+```cpp
+m_motion_blur_pass.initialize(...);
+```
+
+这会重复创建 descriptor set layout、pipeline、render pass 等资源。更合理的做法：
+
+1. 初始化阶段只 `initialize()` 一次。
+2. swapchain recreate 时销毁并重建 motion blur framebuffer。
+3. 更新 motion blur descriptor：
+
+```cpp
+m_motion_blur_pass.updateAfterFramebufferRecreate(
+    m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd],
+    m_global_render_resource._storage_buffer._global_upload_ringbuffer);
+```
+
+同时需要：
+
+1. 销毁旧 `m_ui_combine_framebuffers`。
+2. `setupUICombineFramebuffers()` 重建 RP3 framebuffers。
+3. `m_combine_ui_pass.updateAfterFramebufferRecreate(backup_even, backup_odd)`。
+
+### 第四步：补 cleanup
+
+需要清理：
+
+```cpp
+for (VkFramebuffer framebuffer : m_ui_combine_framebuffers)
+{
+    vkDestroyFramebuffer(m_vulkan_context._device, framebuffer, nullptr);
+}
+m_ui_combine_framebuffers.clear();
+
+if (m_ui_combine_render_pass != VK_NULL_HANDLE)
+{
+    vkDestroyRenderPass(m_vulkan_context._device, m_ui_combine_render_pass, nullptr);
+    m_ui_combine_render_pass = VK_NULL_HANDLE;
+}
+```
+
+Motion blur pass 自己的 render pass/framebuffer/pipeline/layout/descriptor layout 也应在统一 render pass cleanup 中销毁。当前项目整体 render pass cleanup 本来就比较弱，可以先补关键 framebuffer/render pass，后续再系统整理。
+
+### 第五步：调 shader 效果
+
+当前 shader 已经能表达 camera motion blur，但建议做这些修正：
+
+1. UV 采样 clamp，避免越界采样：
+
+```glsl
+vec2 sampleUV = clamp(out_UV - velocity * t, vec2(0.0), vec2(1.0));
+```
+
+2. 天空/远平面不做模糊：
+
+```glsl
+if (depth >= 0.999)
+{
+    out_color = texture(in_ColorTex, out_UV);
+    return;
+}
+```
+
+3. 限制速度时先判断长度，避免 normalize 零向量。
+4. 后续把 `blurScale`、`maxVelocity`、`numSamples` 做成可配置项。
+
+## 推荐的最小可用实现目标
+
+先实现 **camera motion blur**，不要一开始就做 per-object motion blur。
+
+最小目标：
+
+1. 相机快速移动/旋转时，画面出现屏幕空间拖影。
+2. UI 不被模糊。
+3. 静止相机时画面基本不变。
+4. swapchain resize 后不崩溃。
+
+暂不覆盖：
+
+1. 角色骨骼动画自身运动模糊。
+2. 单个物体移动但相机不动时的真实 motion blur。
+3. 透明物体/粒子精确速度。
+
+如果后面要做完整 per-object motion blur，需要新增 velocity buffer，或至少保存上一帧 model matrix，并在 geometry pass 输出每个像素速度。
+
+## 当前重点文件清单
+
+| 文件 | 后续动作 |
+| --- | --- |
+| `passes/motion_blur.cpp` | 修编译错误，补 framebuffer recreate 支持 |
+| `vulkan_passes.h` | 修 `PMotionBlurPass` 私有函数声明 |
+| `vulkan_manager.cpp` | 改 3-RP draw 编排，删除重复函数 |
+| `render_passes.cpp` | 调整初始化顺序，保留 RP3 创建逻辑 |
+| `swapchain.cpp` | 改 recreate 逻辑，重建 RP3 framebuffer，更新 descriptors |
+| `main_camera.cpp` | 修 `drawForward()`，调整 depth final layout |
+| `combine_ui.cpp` | 已基本正确，确认 subpass=1 和输入顺序 |
+| `motion_blur.frag` | 跑通后优化 UV/depth/速度限制 |

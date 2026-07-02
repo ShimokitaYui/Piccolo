@@ -12,8 +12,40 @@ namespace Pilot
     {
         m_viewport = render_scene_viewport;
 
-        m_scissor.offset = {0, 0};
-        m_scissor.extent = m_vulkan_context._swapchain_extent;
+        int32_t scissor_offset_x = static_cast<int32_t>(render_scene_viewport.x);
+        int32_t scissor_offset_y = static_cast<int32_t>(render_scene_viewport.y);
+        if (scissor_offset_x < 0)
+        {
+            scissor_offset_x = 0;
+        }
+        if (scissor_offset_y < 0)
+        {
+            scissor_offset_y = 0;
+        }
+
+        uint32_t scissor_width    = static_cast<uint32_t>(render_scene_viewport.width);
+        uint32_t scissor_height   = static_cast<uint32_t>(render_scene_viewport.height);
+        uint32_t scissor_offset_x_u = static_cast<uint32_t>(scissor_offset_x);
+        uint32_t scissor_offset_y_u = static_cast<uint32_t>(scissor_offset_y);
+        if (scissor_offset_x_u >= m_vulkan_context._swapchain_extent.width)
+        {
+            scissor_width = 0;
+        }
+        else if (scissor_offset_x_u + scissor_width > m_vulkan_context._swapchain_extent.width)
+        {
+            scissor_width = m_vulkan_context._swapchain_extent.width - scissor_offset_x_u;
+        }
+        if (scissor_offset_y_u >= m_vulkan_context._swapchain_extent.height)
+        {
+            scissor_height = 0;
+        }
+        else if (scissor_offset_y_u + scissor_height > m_vulkan_context._swapchain_extent.height)
+        {
+            scissor_height = m_vulkan_context._swapchain_extent.height - scissor_offset_y_u;
+        }
+
+        m_scissor.offset = {scissor_offset_x, scissor_offset_y};
+        m_scissor.extent = {scissor_width, scissor_height};
     }
 
     uint32_t PVulkanManager::getGuidOfPickedMesh(Vector2 picked_uv)
